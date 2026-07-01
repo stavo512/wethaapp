@@ -1,0 +1,10 @@
+{
+  "name": "Weather",
+  "short_name": "Weather",
+  "start_url": "master.html",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#ede5d8",
+  "theme_color": "#d4c5a9",
+  "icons": []
+}

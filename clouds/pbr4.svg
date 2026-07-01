@@ -1,0 +1,9 @@
+<svg id="clouds" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="720" height="720" viewBox="0 0 720 720">
+  <g id="pclo1">
+    <g id="perc">
+      <g id="lil_rain_st" data-name="lil rain st">
+        <image x="256" y="438" width="106" height="57" xlink:href="data:img/png;base64,iVBORw0KGgoAAAANSUhEUgAAAGoAAAA5CAYAAADeO77OAAABoUlEQVR4nO2cQW6DMBBFbZS79TztIndIFz1PezqqRHVkYDA2kj0zzXsSygIURX76ngnGxPfbdygwhxDi/fTX9a10HXTmInz9zKDbY3r1AfDCWtRumj4+f159rFRZi4rCj2EqNEB1okCXphrF9KdHLqqUJpKmTC5Kqk8bSJUOtOdOqJ36as5DR5IoJBgn3UKKyBpDTY2X7quSKCfQTOgxZ8cCKXVJVFVrDl2oGvsps4osHWYpXetUTX+CaiQhsi9pfMV+gRplh2JDJy1zrJNDkvrQNK57iYo7nzCQvE6Vpj7kGKK5RvE00hA29erCwPuArs8ui1Qhyi6LHgFRdiFRhjjsrFOLjihdqpeXEGWbp0hEOeA+/SFqMNn/1qZVdUQ5QdofBR0QltebHigiUXow9f1HEKVDS5oe1yJKh+a1PkTp0JKoh1REOQFRNjicChFlg8PdnohyAqKcgCgnIMoJiBrPqU2DiPLBjCgnIMoJiBrPqc0XiLKHJDIiajyn3pCDqPHU7plOsMyhzJEsNgkYorRfevFKCR4X02f92oJt0kIIv4YhQ7OYeieIAAAAAElFTkSuQmCC"/>
+      </g>
+    </g>
+  </g>
+</svg>

@@ -1,0 +1,1480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#d4c5a9">
+<link rel="manifest" href="manifest.json">
+<title>Weather</title>
+<style>
+  :root{
+    --bg:#ffffff;
+    --panel:#0c1320;
+    --line:rgba(255,255,255,0.18);
+    --text:#f4f0e6;
+  }
+  *{box-sizing:border-box;}
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #ede5d8;
+    height: 100%;
+    overflow: hidden;
+  }
+  html {
+    background: #fff;
+  }
+
+  body {
+    font-family: Cambria, Georgia, "Times New Roman", serif;
+  }
+
+  /* ===================================================================
+     PHONE FRAME — 1080 x 2400 (your phone's resolution)
+     readings touches the top, visual sits dead center, interface
+     touches the bottom.
+
+     Fixed + scaled (via JS, see fitPhone() near the end of <body>) so
+     the whole 2400px-tall frame fits the browser window without manual
+     zooming. Children inside are unaffected — they're all positioned
+     relative to this box's intrinsic 1080x2400 size.
+     =================================================================== */
+  .phone {
+    position: fixed;
+    top: 0;
+    left: 50%;
+    width: 1080px;
+    height: 2400px;
+    background: #fff;
+    overflow: hidden;
+    transform-origin: top center;
+  }
+
+  .anchor-top {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .anchor-middle {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+  }
+
+  .anchor-bottom {
+    position: absolute;
+    bottom: 15px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  /* ===================================================================
+     READINGS (purple-outline box) — from readings.html
+     NOTE: .row and .stack were renamed to .rd-row / .rd-unit-stack
+     here because those exact class names are also used by visual.html
+     and interface.html for unrelated things. Only a renaming, no
+     visual changes.
+     =================================================================== */
+  /* moved down to sit directly on top of the visual (touching its top
+     edge at 764px); position:absolute set explicitly here (ID beats
+     class) since .stats-box's own position:relative below was silently
+     overriding .anchor-top's position:absolute */
+  #statsBox {
+    position: absolute;
+    top: 200px;
+  }
+  /* scaled up so the box spans the full 1080px phone width;
+     transform-origin keeps the top edge pinned to anchor-top */
+  .stats-box {
+    position: relative;
+    width: 942px;
+    height: 492px;
+    background: #fff;
+    box-sizing: border-box;
+    color: #000;
+    transform: translateX(-50%) scale(1.14650);
+    transform-origin: top center;
+  }
+
+  .stat {
+    position: absolute;
+  }
+
+  .stat-icon {
+    position: absolute;
+  }
+
+  .stat-icon svg,
+  .stat-icon img {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  .stat-num {
+    font-size: 44px;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .unit-mm {
+    font-size: 31px;
+  }
+
+  .rd-unit-stack {
+    display: inline-flex;
+    flex-direction: column;
+    justify-content: space-between;
+    font-size: 17px;
+    line-height: 1;
+    text-align: center;
+  }
+
+  .rd-row {
+    display: flex;
+    align-items: center;
+  }
+
+  .rd-row.baseline {
+    align-items: baseline;
+  }
+
+  .gap-sm {
+    margin-left: 4px;
+  }
+
+  /* ===================================================================
+     INTERFACE (yellow ticker + blue time-scroller) — from interface.html
+     =================================================================== */
+  /* scaled up so the ticker/picker span the full 1080px phone width;
+     transform-origin keeps the bottom edge pinned to anchor-bottom */
+  .stack {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    transform: translateX(-50%) scale(1.35);
+    transform-origin: bottom center;
+  }
+
+  .ticker {
+    position: relative;
+    width: 800px;
+    height: 100px;
+    background: #d4c5a9;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+  }
+
+  .ticker-arrow {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: opacity 0.15s ease;
+  }
+
+  .ticker-arrow .tri {
+    width: 0;
+    height: 0;
+    border-top: 10px solid transparent;
+    border-bottom: 10px solid transparent;
+  }
+
+  .ticker-arrow.left .tri {
+    border-right: 16px solid #000;
+  }
+
+  .ticker-arrow.right .tri {
+    border-left: 16px solid #000;
+  }
+
+  .ticker-text {
+    font-size: 19px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 8px;
+    white-space: nowrap;
+    transition: opacity 0.15s ease;
+  }
+
+  /* bottom edge retracted 250px (canvas-space): height reduced and the
+     same amount added back as margin-bottom, so the picker's own box
+     shrinks from the bottom while its top edge (and everything above
+     it, like the ticker) doesn't move at all */
+  .picker {
+    position: relative;
+    width: 800px;
+    height: 514.81px;
+    margin-bottom: 185.19px;
+    box-sizing: border-box;
+    overflow: hidden;
+    background: #ede5d8;
+    cursor: grab;
+    user-select: none;
+    touch-action: none;
+  }
+
+  .picker.dragging {
+    cursor: grabbing;
+  }
+
+  .dot {
+    position: absolute;
+    top: 0;
+    left: 0;
+    background: #000;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+  }
+
+  .label {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    transform: translateY(-50%);
+    font-size: 38px;
+    line-height: 1;
+    font-weight: bold;
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.08s linear;
+  }
+
+  .pointer {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    width: 0;
+    height: 0;
+    border-top: 9px solid transparent;
+    border-bottom: 9px solid transparent;
+    border-left: 28px solid #000;
+    transform: translateY(-50%);
+  }
+
+  /* ===================================================================
+     VISUAL (sun/moon + clouds) — from visual.html
+     scaled up so it spans the full 1080px phone width; transform-origin
+     stays centered since this is the section that "sits dead center"
+     =================================================================== */
+  /* top-anchored (not centered) so its top edge sits exactly 200px below
+     the readings box and grows downward from there; its bottom half is
+     just white "ground" so the taller ticker/picker stack below is
+     allowed to sit on top of it */
+  #stage{
+    position: absolute;
+    top: 764px;
+    left: 50%;
+    transform: translateX(-50%) scale(2.25);
+    transform-origin: top center;
+  }
+  .stage{
+    position:relative;
+    width:480px;
+    height:480px;
+    max-width:100%;
+    overflow:hidden;
+    background:inherit;
+  }
+  .circle-outline{
+    position:absolute;
+    border:1px dashed rgba(255,255,255,0.25);
+    border-radius:50%;
+    display:none;
+  }
+  .orbit-circle{
+    position:absolute;
+    left:50%;
+    top:50%;
+    width:100%;
+    height:100%;
+    transform:translate(-50%, -50%);
+    border:3px solid #d4c5a9;
+    border-radius:50%;
+    pointer-events:none;
+  }
+  .debug-spawn-zone{
+    position:absolute;
+    left:15%;
+    right:15%;
+    width:70%;
+    background:rgba(255, 0, 0, 0.15);
+    border:2px solid rgba(255, 0, 0, 0.5);
+    pointer-events:none;
+    z-index:0;
+    display:none;
+  }
+  .bottom-white-cover{
+    position:absolute;
+    left:0;
+    right:0;
+    top:50%;
+    bottom:0;
+    background:#ffffff;
+    pointer-events:none;
+    z-index:2;
+  }
+  .debug-visible-zone{
+    position:absolute;
+    left:0;
+    right:0;
+    top:0;
+    background:rgba(255, 192, 203, 0.08);
+    border:2px solid rgba(255, 192, 203, 0.4);
+    pointer-events:none;
+    z-index:0;
+    display:none;
+  }
+  .horizon{
+    position:absolute;
+    left:0;
+    right:0;
+    top:50%;
+    height:4px;
+    background:#d4c5a9;
+    z-index:3;
+  }
+  .bg-rect{
+    position:absolute;
+    left:0;
+    right:0;
+    top:0;
+    z-index:0;
+    pointer-events:none;
+  }
+  .cloud-spawn-rect{
+    position:absolute;
+    left:0;
+    right:0;
+    top:0;
+    bottom:0;
+    border:2px dashed rgba(100, 200, 255, 0.3);
+    pointer-events:none;
+    z-index:0;
+    display:none;
+  }
+  .horizon-cover{
+    position:absolute;
+    left:0;
+    right:0;
+    top:50%;
+    bottom:0;
+    background:var(--bg);
+    pointer-events:none;
+    z-index:2;
+    display:none;
+  }
+  .top-half-tint{
+    position:absolute;
+    left:0; right:0; top:0; height:50%;
+    background:rgba(255,255,255,0.03);
+    border-radius:240px 240px 0 0;
+    display:none;
+  }
+  .body-icon{
+    position:absolute;
+    width:140px;
+    height:140px;
+    transform:translate(-50%,-50%);
+    pointer-events:none;
+    transition:opacity 0.15s linear;
+  }
+  .body-icon#moonIcon{
+    width:118px;
+    height:118px;
+  }
+  .body-icon img{
+    width:100%;
+    height:100%;
+    display:block;
+  }
+
+  /* cloud layer */
+  .clouds-container{
+    position:absolute;
+    left:0; top:0; right:0; bottom:0;
+    pointer-events:none;
+    z-index:1;
+  }
+  .cloud-item{
+    position:absolute;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .cloud-img{
+    width:100%;
+    height:100%;
+    display:block;
+  }
+  .cloud-precip{
+    position:absolute;
+    width:100%;
+    height:100%;
+    display:block;
+  }
+  .cloud-snow-overlay{
+    position:fixed;
+    pointer-events:none;
+    z-index:1;
+  }
+
+  .panel{
+    margin-top:28px;
+    width:480px;
+    max-width:100%;
+    background:var(--panel);
+    border-radius:16px;
+    padding:18px 20px;
+    border:1px solid rgba(255,255,255,0.06);
+    display:none;
+  }
+  .row{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    margin-bottom:12px;
+  }
+  .row:last-child{ margin-bottom:0; }
+  .row label{
+    width:90px;
+    font-size:13px;
+    opacity:0.8;
+    flex-shrink:0;
+  }
+  .row input[type="text"]{
+    flex:1;
+    background:#1a2236;
+    border:1px solid rgba(255,255,255,0.1);
+    color:var(--text);
+    padding:8px 10px;
+    border-radius:8px;
+    font-size:14px;
+    font-variant-numeric: tabular-nums;
+  }
+  .row .hint{
+    font-size:11px;
+    opacity:0.45;
+    width:170px;
+    flex-shrink:0;
+  }
+  .debug{
+    margin-top:28px;
+    width:480px;
+    max-width:100%;
+    font-size:12px;
+    opacity:0.55;
+    line-height:1.6;
+    font-variant-numeric: tabular-nums;
+    display:none;
+  }
+  .debug span{ color:#ff8a3d; }
+</style>
+</head>
+<body>
+
+<div class="phone">
+
+  <!-- ===================== READINGS (top) ===================== -->
+  <div class="stats-box anchor-top" id="statsBox">
+
+    <!-- THERMOMETER + TEMPERATURE -->
+    <div class="stat-icon" style="left:145px; top:96px; width:43px; height:135px;">
+      <img src="assets/icon temp.svg" alt="temperature">
+    </div>
+    <div class="stat rd-row baseline" style="left:192px; top:100px;">
+      <span class="stat-num" id="tempVal"></span>
+    </div>
+
+    <!-- WIND -->
+    <div class="stat-icon" style="left:231px; top:317px; width:105px; height:77px;">
+      <img src="assets/icon wind.svg" alt="wind">
+    </div>
+    <div class="stat rd-row" style="left:146px; top:340px; align-items:flex-end;">
+      <span class="stat-num" id="windVal"></span>
+      <span class="rd-unit-stack gap-sm" style="height:32px; position:relative; top:-6px; left:2px;"><span>km</span><span>h</span></span>
+    </div>
+
+    <!-- RAINDROP -->
+    <div class="stat-icon" style="left:532px; top:205px; width:44px; height:130px;">
+      <img src="assets/icon rain.svg" alt="rain">
+    </div>
+    <div class="stat rd-row baseline" style="left:502px; top:338px;">
+      <span class="stat-num" id="rainVal"></span>
+      <span class="unit-mm gap-sm">mm</span>
+    </div>
+
+    <!-- HUMIDITY -->
+    <div class="stat rd-row baseline" style="left:711px; top:309px;">
+      <span class="stat-num" id="humidityVal"></span>
+      <span class="stat-num gap-sm">%</span>
+    </div>
+    <div class="stat-icon" style="left:709px; top:358px; width:89px; height:116px;">
+      <img src="assets/icon humid.svg" alt="humidity">
+    </div>
+
+  </div>
+
+  <!-- ===================== VISUAL (middle) ===================== -->
+  <div class="stage anchor-middle" id="stage">
+    <div class="bg-rect" id="bgRect"></div>
+    <div class="top-half-tint"></div>
+    <div class="debug-visible-zone" id="debugVisibleZone"></div>
+    <div class="debug-spawn-zone" id="debugSpawnZone"></div>
+    <div class="cloud-spawn-rect" id="cloudSpawnRect"></div>
+    <div class="circle-outline" id="outerCircle"></div>
+    <div class="orbit-circle" id="sunOrbitCircle"></div>
+    <div class="orbit-circle" id="moonOrbitCircle"></div>
+
+    <!-- clouds layer -->
+    <div class="clouds-container" id="cloudsContainer"></div>
+
+    <div class="horizon-cover" id="horizonCover"></div>
+    <div class="horizon" id="horizonLine"></div>
+    <div class="body-icon" id="sunIcon"><img id="sunImg" src="" alt="sun" /></div>
+    <div class="body-icon" id="moonIcon"><img id="moonImg" src="" alt="moon" /></div>
+    <div class="bottom-white-cover"></div>
+  </div>
+
+  <!-- kept so the visual script's getElementById calls don't fail; not shown (display:none) -->
+  <div class="panel">
+    <div class="row">
+      <label for="sunpos">sunpos</label>
+      <input type="text" id="sunpos" value="0.20" />
+      <span class="hint">0 = top, 0.5 = bottom</span>
+    </div>
+    <div class="row">
+      <label for="moonpos">moonpos</label>
+      <input type="text" id="moonpos" value="0.70" />
+      <span class="hint">0 = top, 0.5 = bottom</span>
+    </div>
+    <div class="row">
+      <label for="heat">heat</label>
+      <input type="text" id="heat" value="2" />
+      <span class="hint">1 cold &middot; 2 medium &middot; 3 hot</span>
+    </div>
+    <div class="row">
+      <label for="moonstate">moonstate</label>
+      <input type="text" id="moonstate" value="4" />
+      <span class="hint">1 to 8</span>
+    </div>
+    <div class="row">
+      <label for="horizon">horizon</label>
+      <input type="text" id="horizon" value="0.50" />
+      <span class="hint">0 = top, 0.5 = middle, 1 = bottom</span>
+    </div>
+    <div style="margin-top:20px; padding-top:20px; border-top:1px solid rgba(255,255,255,0.06);">
+      <div class="row">
+        <label for="windspeed">windspeed</label>
+        <input type="text" id="windspeed" value="2" />
+        <span class="hint">0 to 5</span>
+      </div>
+      <div class="row">
+        <label for="direction">direction</label>
+        <input type="text" id="direction" value="L" />
+        <span class="hint">L or R</span>
+      </div>
+      <div class="row">
+        <label for="density">density</label>
+        <input type="text" id="density" value="0.5" />
+        <span class="hint">0 to 1</span>
+      </div>
+      <div class="row">
+        <label for="precipitation">precip</label>
+        <input type="text" id="precipitation" value="N" />
+        <span class="hint">N R H S</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="debug" id="debug"></div>
+
+  <!-- ===================== INTERFACE (bottom) ===================== -->
+  <div class="stack anchor-bottom" id="interfaceStack">
+
+    <div class="ticker" id="ticker">
+      <div class="ticker-arrow left" id="tickerLeft"><div class="tri"></div></div>
+      <div class="ticker-text" id="tickerText"></div>
+      <div class="ticker-arrow right" id="tickerRight"><div class="tri"></div></div>
+    </div>
+
+    <div class="picker" id="picker">
+      <div class="pointer" id="pointer"></div>
+      <div class="label" id="label"></div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+  // scales the whole 1080x2400 phone frame down to fit the browser
+  // window, so the entire mockup is visible without manual zoom/scroll
+  (function () {
+    const phone = document.querySelector('.phone');
+    function fitPhone() {
+      const scale = window.innerWidth / 1080;
+      phone.style.transform = `translateX(-50%) scale(${scale})`;
+    }
+    window.addEventListener('resize', fitPhone);
+    fitPhone();
+  })();
+</script>
+
+<script>
+  // ===================================================================
+  // READINGS — placeholder values shown until the first live fetch
+  // resolves, then driven by weatherDataReady (see LOCATIONS below).
+  // ===================================================================
+  document.getElementById('tempVal').textContent = '24 °C';
+  document.getElementById('windVal').textContent = '15';
+  document.getElementById('rainVal').textContent = '19';
+  document.getElementById('humidityVal').textContent = '18';
+
+  window.addEventListener('weatherDataReady', (e) => {
+    const data = e.detail;
+    document.getElementById('tempVal').textContent = Math.round(data.temperature.value) + ' °C';
+    document.getElementById('windVal').textContent = Math.round(data.wind.speed);
+    document.getElementById('rainVal').textContent = Math.round(data.precipitation.amount);
+    document.getElementById('humidityVal').textContent = Math.round(data.humidity.value);
+  });
+</script>
+
+<script>
+  // ===================================================================
+  // INTERFACE — time scroller + weather ticker
+  // ===================================================================
+  const picker = document.getElementById('picker');
+  const labelEl = document.getElementById('label');
+  const pointerEl = document.getElementById('pointer');
+
+  function getBaseHour(now) {
+    const d = new Date(now);
+    const mins = d.getMinutes();
+    d.setMinutes(0, 0, 0);
+    if (mins >= 30) d.setHours(d.getHours() + 1);
+    return d;
+  }
+
+  // hour-deltas for the picker's first 7 slots; the 8th slot ("tomorrow")
+  // is resolved separately, against the location's own local calendar day
+  const SLOT_HOUR_OFFSETS = [0, 1, 2, 3, 4, 6, 8];
+
+  function buildSlots() {
+    const base = getBaseHour(new Date());
+    const labels = ['now', 'in one hour', 'in two hours', 'in three hours',
+                     'in four hours', 'in six hours', 'in eight hours'];
+
+    const slots = SLOT_HOUR_OFFSETS.map((h, i) => {
+      const t = new Date(base);
+      t.setHours(t.getHours() + h);
+      return { label: labels[i], time: t };
+    });
+
+    const tomorrow = new Date(base);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(12, 0, 0, 0);
+    slots.push({ label: 'tomorrow', time: tomorrow });
+
+    return slots;
+  }
+
+  const slots = buildSlots();
+
+  const SPACING_BASE = 80;
+  const BIG_D = 34;
+  const MIN_D = 8;
+  const SIZE_DECAY = 0.4;
+  const MIN_OFFSET = 0;
+  const MAX_OFFSET = slots.length - 1;
+  const LABEL_SHOW_THRESHOLD = 0.12;
+
+  const GROUP_SHIFT_FRACTION = 0.25;
+  const TRIANGLE_LEN = 28;
+  const TRIANGLE_HALF = TRIANGLE_LEN / 2;
+  const GAP_TIP_TO_DOT = 8;
+  const GAP_LABEL_FROM_DOT = 30;
+  const LABEL_VERTICAL_NUDGE = { now: -3 };
+
+  function signedOffset(x) {
+    return Math.sign(x) * SPACING_BASE * Math.log(1 + Math.abs(x));
+  }
+
+  function dotSize(d) {
+    const s = BIG_D * Math.pow(SIZE_DECAY, d);
+    return Math.max(MIN_D, s);
+  }
+
+  let scrollOffset = 0;
+  let snapAnim = null;
+
+  const dotEls = slots.map(() => {
+    const el = document.createElement('div');
+    el.className = 'dot';
+    picker.appendChild(el);
+    return el;
+  });
+
+  function render() {
+    const W = picker.clientWidth;
+    const H = picker.clientHeight;
+    const anchorY = H / 2;
+    const dotCenterX = W * (0.5 - GROUP_SHIFT_FRACTION) - 1.5 * TRIANGLE_LEN + 2 * TRIANGLE_LEN + 0.75 * TRIANGLE_LEN + 1 * TRIANGLE_LEN;
+
+    let nearestIndex = 0;
+    let nearestDist = Infinity;
+
+    dotEls.forEach((el, i) => {
+      const x = i - scrollOffset;
+      const dist = Math.abs(x);
+      const y = anchorY + signedOffset(x);
+      const size = dotSize(dist);
+
+      el.style.top = y + 'px';
+      el.style.left = (dotCenterX + TRIANGLE_LEN) + 'px';
+      el.style.width = size + 'px';
+      el.style.height = size + 'px';
+
+      if (dist < nearestDist) {
+        nearestDist = dist;
+        nearestIndex = i;
+      }
+    });
+
+    if (nearestDist < LABEL_SHOW_THRESHOLD) {
+      const lbl = slots[nearestIndex].label;
+      labelEl.textContent = lbl;
+      labelEl.style.opacity = '1';
+      labelEl.style.top = (anchorY + (LABEL_VERTICAL_NUDGE[lbl] || 0)) + 'px';
+    } else {
+      labelEl.style.opacity = '0';
+    }
+    labelEl.style.left = (dotCenterX + GAP_LABEL_FROM_DOT - TRIANGLE_HALF + 2 * TRIANGLE_LEN) + 'px';
+
+    pointerEl.style.top = anchorY + 'px';
+    pointerEl.style.left = (dotCenterX - GAP_TIP_TO_DOT - TRIANGLE_LEN - TRIANGLE_HALF) + 'px';
+  }
+
+  function easeOutCubic(x) {
+    return 1 - Math.pow(1 - x, 3);
+  }
+
+  function cancelSnap() {
+    if (snapAnim !== null) {
+      cancelAnimationFrame(snapAnim);
+      snapAnim = null;
+    }
+  }
+
+  function snapToNearest() {
+    const target = Math.round(scrollOffset);
+    const start = scrollOffset;
+    const distance = target - start;
+    if (distance === 0) { render(); onSlotSettled(target); return; }
+
+    const duration = 180;
+    const startTime = performance.now();
+
+    function step(now) {
+      const elapsed = now - startTime;
+      const p = Math.min(1, elapsed / duration);
+      scrollOffset = start + distance * easeOutCubic(p);
+      render();
+      if (p < 1) {
+        snapAnim = requestAnimationFrame(step);
+      } else {
+        scrollOffset = target;
+        render();
+        snapAnim = null;
+        onSlotSettled(target);
+      }
+    }
+    snapAnim = requestAnimationFrame(step);
+  }
+
+  // ---- forecast lookup for the settled slot ----------------------------
+  // slot 0 ("now") always uses the live "now" snapshot; slots 1-6 index
+  // straight into the hourly forecast by hour-delta; the last slot
+  // ("tomorrow") is resolved against the location's own local noon.
+  function addDaysToDateStr(dateStr, days) {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const dt = new Date(Date.UTC(y, m - 1, d + days));
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${dt.getUTCFullYear()}-${pad(dt.getUTCMonth() + 1)}-${pad(dt.getUTCDate())}`;
+  }
+
+  function getSlotData(data, index) {
+    if (index === 0) return data;
+    if (!data.hourly || !data.hourly.length) return null;
+    if (index < SLOT_HOUR_OFFSETS.length) {
+      return data.hourly[SLOT_HOUR_OFFSETS[index]] || data.hourly[data.hourly.length - 1];
+    }
+    const todayStr = data.hourly[0].localTime.slice(0, 10);
+    const target = addDaysToDateStr(todayStr, 1) + 'T12:00';
+    return window.findSlotByLocalTime(data.hourly, target) || data.hourly[data.hourly.length - 1];
+  }
+
+  function onSlotSettled(index) {
+    const data = window.locationsApi && window.locationsApi.lastData;
+    if (!data) return; // first fetch hasn't resolved yet
+    const slotData = getSlotData(data, index);
+    if (slotData) window.dispatchEvent(new CustomEvent('weatherDataReady', { detail: slotData }));
+  }
+
+  let dragging = false;
+  let startY = 0;
+  let startOffset = 0;
+
+  function clamp(v) {
+    return Math.min(MAX_OFFSET, Math.max(MIN_OFFSET, v));
+  }
+
+  picker.addEventListener('pointerdown', (e) => {
+    cancelSnap();
+    dragging = true;
+    picker.classList.add('dragging');
+    startY = e.clientY;
+    startOffset = scrollOffset;
+    picker.setPointerCapture(e.pointerId);
+  });
+
+  picker.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    const deltaY = e.clientY - startY;
+    scrollOffset = clamp(startOffset - deltaY / SPACING_BASE);
+    render();
+  });
+
+  function endDrag(e) {
+    if (!dragging) return;
+    dragging = false;
+    picker.classList.remove('dragging');
+    snapToNearest();
+  }
+
+  picker.addEventListener('pointerup', endDrag);
+  picker.addEventListener('pointercancel', endDrag);
+
+  let wheelSnapTimer = null;
+  picker.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    cancelSnap();
+    clearTimeout(wheelSnapTimer);
+    scrollOffset = clamp(scrollOffset + e.deltaY / SPACING_BASE);
+    render();
+    wheelSnapTimer = setTimeout(snapToNearest, 120);
+  }, { passive: false });
+
+  render();
+  window.addEventListener('resize', render);
+
+  // ===================================================================
+  // TICKER (yellow rectangle) — location switcher. Picking a location
+  // here refetches weather for that place and re-dispatches
+  // 'weatherDataReady', which drives both the visual and the readings.
+  // ===================================================================
+  const LOCATIONS = [
+    { label: 'CURRENT LOCATION', location: undefined },
+    { label: 'BOLZANO', location: { name: 'Bolzano, IT', latitude: 46.4983, longitude: 11.3548 } },
+    { label: 'COL DU GALIBIER', location: { name: 'Col du Galibier, FR', latitude: 45.0612, longitude: 6.4078 } },
+    { label: 'ABERYSTWYTH', location: { name: 'Aberystwyth, GB', latitude: 52.4153, longitude: -4.0829 } },
+    { label: 'MANAUS', location: { name: 'Manaus, BR', latitude: -3.1190, longitude: -60.0217 } },
+    { label: 'BELIZE CITY', location: { name: 'Belize City, BZ', latitude: 17.2510, longitude: -88.7590 } },
+  ];
+  // ===================================================================
+
+  const ticker = document.getElementById('ticker');
+  const tickerTextEl = document.getElementById('tickerText');
+  const tickerLeftEl = document.getElementById('tickerLeft');
+  const tickerRightEl = document.getElementById('tickerRight');
+
+  let tickerIndex = 0;
+  let tickerTransitioning = false;
+  const TICKER_FADE_MS = 150;
+
+  function renderTicker() {
+    tickerTextEl.textContent = LOCATIONS[tickerIndex].label;
+  }
+
+  // weather-data.js loads after this script, so this is only ever
+  // called later (on user interaction or from the visual script once
+  // it's definitely loaded) — never at parse time.
+  function fetchLocationData(idx) {
+    const loc = LOCATIONS[idx].location;
+    let promise;
+    if (loc) {
+      promise = window.getWeatherData(loc);
+    } else if (navigator.geolocation) {
+      promise = new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(
+          pos => {
+            const geoLoc = { name: 'Current Location', latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+            window.getWeatherData(geoLoc).then(resolve).catch(reject);
+          },
+          () => window.getWeatherData().then(resolve).catch(reject),
+          { timeout: 5000 }
+        );
+      });
+    } else {
+      promise = window.getWeatherData();
+    }
+    promise.then(data => {
+      window.locationsApi.lastData = data;
+      const currentSlot = Math.round(scrollOffset);
+      const slotData = getSlotData(data, currentSlot);
+      window.dispatchEvent(new CustomEvent('weatherDataReady', { detail: slotData || data }));
+    }).catch(err => {
+      window.dispatchEvent(new CustomEvent('weatherDataError', { detail: err }));
+    });
+  }
+
+  function switchTicker(step) {
+    if (tickerTransitioning) return;
+    tickerTransitioning = true;
+
+    tickerTextEl.style.opacity = '0';
+    tickerLeftEl.style.opacity = '0';
+    tickerRightEl.style.opacity = '0';
+
+    setTimeout(() => {
+      tickerIndex = (tickerIndex + step + LOCATIONS.length) % LOCATIONS.length;
+      renderTicker();
+
+      tickerTextEl.style.opacity = '1';
+      tickerLeftEl.style.opacity = '1';
+      tickerRightEl.style.opacity = '1';
+
+      tickerTransitioning = false;
+      fetchLocationData(tickerIndex);
+    }, TICKER_FADE_MS);
+  }
+
+  tickerLeftEl.addEventListener('click', () => switchTicker(-1));
+  tickerRightEl.addEventListener('click', () => switchTicker(1));
+
+  ticker.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    switchTicker(e.deltaY > 0 ? 1 : -1);
+  }, { passive: false });
+
+  renderTicker();
+
+  // exposed so the visual script (after weather-data.js has loaded)
+  // can trigger the initial fetch + keep the selected location refreshed,
+  // and so the picker can look up forecast data for the settled slot
+  window.locationsApi = {
+    fetchLocationData,
+    getCurrentIndex: () => tickerIndex,
+    lastData: null,
+  };
+</script>
+
+<script src="weather-data.js"></script>
+<script src="weather-to-inputs.js"></script>
+<script>
+// ===================================================================
+// VISUAL — sun/moon + clouds (from visual.html)
+// ===================================================================
+(function(){
+  const stage = document.getElementById('stage');
+  const cloudsContainer = document.getElementById('cloudsContainer');
+  const sunIcon = document.getElementById('sunIcon');
+  const moonIcon = document.getElementById('moonIcon');
+  const sunImg = document.getElementById('sunImg');
+  const moonImg = document.getElementById('moonImg');
+  const debugEl = document.getElementById('debug');
+
+  const inputs = {
+    sunpos: { value: '0.85' },
+    moonpos: { value: '0.40' },
+    heat: { value: '3' },
+    moonstate: { value: '7' },
+    horizon: { value: '0.50' },
+    windspeed: { value: '2' },
+    direction: { value: 'L' },
+    density: { value: '0.2' },
+    precipitation: { value: 'R' },
+  };
+
+  function updateWeatherData(data) {
+    if (data.sunpos !== undefined) inputs.sunpos.value = data.sunpos;
+    if (data.moonpos !== undefined) inputs.moonpos.value = data.moonpos;
+    if (data.heat !== undefined) inputs.heat.value = data.heat;
+    if (data.moonstate !== undefined) inputs.moonstate.value = data.moonstate;
+    if (data.horizon !== undefined) inputs.horizon.value = data.horizon;
+    if (data.windspeed !== undefined) inputs.windspeed.value = data.windspeed;
+    if (data.direction !== undefined) inputs.direction.value = data.direction;
+    if (data.density !== undefined) inputs.density.value = data.density;
+    if (data.precipitation !== undefined) inputs.precipitation.value = data.precipitation;
+    render();
+  }
+
+  const sunOrbitRadiusDefault = 0.61;
+  const moonOrbitRadiusDefault = 0.86;
+
+  let sunFrame = 'v1';
+  let moonFrame = 'v1';
+  let cloudFrame = 'f1';
+  let precipFrame = '1';
+
+  const SUN_FRAMES = ['v1','v2'];
+  const MOON_FRAMES = ['v1','v2','v3'];
+  const CLOUD_FRAMES = ['f1','f2'];
+  const PRECIP_FRAMES = ['1','2','3','4'];
+
+  let sunFrameIdx = 0, moonFrameIdx = 0, cloudFrameIdx = 0, precipFrameIdx = 0;
+
+  setInterval(()=>{
+    sunFrameIdx = (sunFrameIdx+1) % SUN_FRAMES.length;
+    sunFrame = SUN_FRAMES[sunFrameIdx];
+    render();
+  }, 700);
+
+  setInterval(()=>{
+    moonFrameIdx = (moonFrameIdx+1) % MOON_FRAMES.length;
+    moonFrame = MOON_FRAMES[moonFrameIdx];
+    render();
+  }, 900);
+
+  setInterval(()=>{
+    cloudFrameIdx = (cloudFrameIdx+1) % CLOUD_FRAMES.length;
+    cloudFrame = CLOUD_FRAMES[cloudFrameIdx];
+    render();
+  }, 650);
+
+  setInterval(()=>{
+    precipFrameIdx = (precipFrameIdx+1) % PRECIP_FRAMES.length;
+    precipFrame = PRECIP_FRAMES[precipFrameIdx];
+    render();
+  }, 400);
+
+  let activeCloudId = 0;
+  let clouds = [];
+  let snowOverlayId = null;
+
+  function generateCloudId(){
+    return 'cloud-' + (++activeCloudId);
+  }
+
+  function getCloudTargetCount(){
+    const dens = clamp(parseFloat(inputs.density.value) || 0.5, 0, 1);
+    const minClouds = 1, maxClouds = 5;
+    return Math.round(minClouds + (maxClouds - minClouds) * dens);
+  }
+
+  function getCloudSize(density){
+    const r = Math.random();
+    if (density < 0.33) return r < 0.85 ? 's' : 'b';
+    if (density < 0.66) return r < 0.5 ? 's' : 'b';
+    return r < 0.3 ? 's' : 'b';
+  }
+
+  function getCloudType(){
+    const precipType = (inputs.precipitation.value || 'N').toUpperCase();
+    return precipType === 'N' ? 'f' : 'p';
+  }
+
+  function getCloudSizeMultiplier(){
+    return 1 + Math.random();
+  }
+
+  function spawnCloud(timestamp){
+    const density = clamp(parseFloat(inputs.density.value) || 0.5, 0, 1);
+    const size = getCloudSize(density);
+    const type = getCloudType();
+    const sizeMultiplier = getCloudSizeMultiplier();
+
+    const stageH = stage.clientHeight;
+    const stageW = stage.clientWidth;
+    const minY = stageH * 0.125;
+    const maxY = stageH * 0.417;
+    const y = minY + Math.random() * (maxY - minY);
+
+    const minX = stageW * 0.15;
+    const maxX = stageW * 0.85;
+    const x = minX + Math.random() * (maxX - minX);
+
+    const dir = (inputs.direction.value || 'L').toUpperCase();
+    const isMovingRight = dir === 'R';
+
+    const cloud = {
+      id: generateCloudId(),
+      type,
+      size,
+      sizeMultiplier,
+      x,
+      y,
+      spawnTime: timestamp,
+      isMovingRight,
+      state: 'spawn',
+      stateStartTime: timestamp,
+    };
+    clouds.push(cloud);
+    return cloud;
+  }
+
+  function updateClouds(timestamp){
+    const windspeed = clamp(parseFloat(inputs.windspeed.value) || 0, 0, 5);
+    const direction = (inputs.direction.value || 'L').toUpperCase();
+    const density = clamp(parseFloat(inputs.density.value) || 0.5, 0, 1);
+    const targetCount = getCloudTargetCount();
+
+    if (clouds.length < targetCount && Math.random() < 0.03) {
+      spawnCloud(timestamp);
+    }
+
+    const stageW = stage.clientWidth;
+    const transitionDuration = 800;
+
+    clouds = clouds.filter(cloud => {
+      if (windspeed > 0) {
+        const speed = 0.8 + (windspeed / 5) * 1.2;
+        const dx = cloud.isMovingRight ? speed : -speed;
+        cloud.x += dx;
+      }
+
+      const elapsed = timestamp - cloud.stateStartTime;
+
+      if (cloud.state === 'spawn') {
+        if (elapsed > transitionDuration) {
+          cloud.state = 'active';
+          cloud.stateStartTime = timestamp;
+        }
+      } else if (cloud.state === 'active') {
+        const stageW = stage.clientWidth;
+        const rectLeft = stageW * 0.15;
+        const rectRight = stageW * 0.85;
+        const isLeavingRect = (cloud.isMovingRight && cloud.x > rectRight) ||
+                              (!cloud.isMovingRight && cloud.x < rectLeft);
+        if (isLeavingRect) {
+          cloud.state = 'despawn';
+          cloud.stateStartTime = timestamp;
+        }
+      }
+
+      if (cloud.state === 'despawn') {
+        const despawnElapsed = timestamp - cloud.stateStartTime;
+        if (despawnElapsed > transitionDuration) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }
+
+  function clamp(v, lo, hi){ return Math.min(hi, Math.max(lo, v)); }
+
+  function parsePos(raw, fallback){
+    let v = parseFloat(raw);
+    if (isNaN(v)) v = fallback;
+    v = v % 1;
+    if (v < 0) v += 1;
+    return v;
+  }
+
+  function posToXY(pos, radius, cx, cy){
+    const angle = pos * Math.PI * 2;
+    const x = cx + Math.sin(angle) * radius;
+    const y = cy - Math.cos(angle) * radius;
+    return { x, y };
+  }
+
+  function sunShapeState(pos){
+    if (pos <= 0.1 || pos >= 0.9) return 's3';
+    if (pos >= 0.2 && pos <= 0.8) return 's1';
+    return 's2';
+  }
+
+  function heatToCode(heatRaw){
+    let h = Math.round(clamp(parseFloat(heatRaw) || 2, 1, 3));
+    return { 1:'c', 2:'m', 3:'h' }[h];
+  }
+
+  function rgbToHex({r,g,b}){
+    const toHex = v => Math.round(v).toString(16).padStart(2, '0');
+    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+  }
+
+  function mixRgb(a, b, t){
+    return {
+      r: a.r + (b.r - a.r) * t,
+      g: a.g + (b.g - a.g) * t,
+      b: a.b + (b.b - a.b) * t,
+    };
+  }
+
+  function backgroundForSunPos(pos){
+    const dark = { r: 16, g: 24, b: 43 };
+    const white = { r: 255, g: 255, b: 255 };
+    if (pos <= 0.2 || pos >= 0.8) return white;
+    if (pos >= 0.3 && pos <= 0.7) return dark;
+    const t = pos < 0.3 ? (pos - 0.2) / 0.1 : (0.8 - pos) / 0.1;
+    let color = mixRgb(white, dark, t);
+    const isRedHint = Math.abs(pos - 0.25) < 0.001 || Math.abs(pos - 0.75) < 0.001;
+    if (isRedHint) {
+      color.r = Math.min(255, color.r + 32);
+      color.g = Math.max(0, color.g - 16);
+      color.b = Math.max(0, color.b - 16);
+    }
+    return color;
+  }
+
+  function isLightColor({r,g,b}){
+    return (r * 0.299 + g * 0.587 + b * 0.114) > 186;
+  }
+
+  function moonStateToCode(stateRaw){
+    let s = Math.round(clamp(parseFloat(stateRaw) || 1, 1, 8));
+    return 's' + s;
+  }
+
+  function getPrecipCode(precipType){
+    const type = (precipType || 'N').toUpperCase();
+    const windspeed = clamp(parseFloat(inputs.windspeed.value) || 0, 0, 5);
+    const isMoving = windspeed > 2;
+
+    switch(type){
+      case 'R': return isMoving ? 'm' : 'r';
+      case 'H': return isMoving ? 'n' : 'h';
+      case 'S': return 's';
+      default: return null;
+    }
+  }
+
+  function renderClouds(){
+    const windspeed = clamp(parseFloat(inputs.windspeed.value) || 0, 0, 5);
+    const direction = (inputs.direction.value || 'L').toUpperCase();
+    const precipType = (inputs.precipitation.value || 'N').toUpperCase();
+    const isMoving = windspeed > 2;
+
+    cloudsContainer.innerHTML = '';
+
+    clouds.forEach(cloud => {
+      const baseW = cloud.size === 'b' ? 220 : 140;
+      const baseH = cloud.size === 'b' ? 130 : 85;
+      const cloudW = baseW * cloud.sizeMultiplier;
+      const cloudH = baseH * cloud.sizeMultiplier;
+
+      let frame;
+      if (cloud.state === 'spawn' || cloud.state === 'despawn') {
+        frame = 't';
+      } else {
+        frame = isMoving ? cloudFrame : cloudFrame;
+      }
+
+      const state = (cloud.state === 'spawn' || cloud.state === 'despawn') ? 's' : (isMoving ? 'm' : 's');
+
+      const cloudFile = `assets/clouds/c${cloud.type}${cloud.size}${state}${frame}.svg`;
+
+      const el = document.createElement('div');
+      el.className = 'cloud-item';
+      el.style.left = (cloud.x - cloudW / 2) + 'px';
+      el.style.top = (cloud.y - cloudH / 2) + 'px';
+      el.style.width = cloudW + 'px';
+      el.style.height = cloudH + 'px';
+
+      if (direction === 'R') {
+        el.style.transform = 'scaleX(-1)';
+      } else if (cloud.state === 'despawn') {
+        el.style.transform = 'scaleX(-1)';
+      }
+
+      const img = document.createElement('img');
+      img.src = cloudFile;
+      img.className = 'cloud-img';
+      el.appendChild(img);
+
+      if (cloud.type === 'p' && precipType !== 'N') {
+        const precipCode = getPrecipCode(precipType);
+        if (precipCode) {
+          const precipFile = `assets/clouds/p${cloud.size}${precipCode}${precipFrame}.svg`;
+          const precipEl = document.createElement('img');
+          precipEl.src = precipFile;
+          precipEl.className = 'cloud-precip';
+          el.appendChild(precipEl);
+
+          if (precipCode === 's') {
+            const snowDiv = document.createElement('div');
+            snowDiv.className = 'cloud-snow-overlay';
+            snowDiv.style.position = 'absolute';
+            snowDiv.style.left = (cloud.x - 70) + 'px';
+            snowDiv.style.top = (cloud.y + cloudH / 2) + 'px';
+            snowDiv.style.width = '140px';
+            snowDiv.style.height = '80px';
+            snowDiv.style.pointerEvents = 'none';
+            snowDiv.style.zIndex = '1';
+
+            const snowImg = document.createElement('img');
+            snowImg.src = `assets/clouds/p${cloud.size}${precipCode}${precipFrame}.svg`;
+            snowImg.style.width = '100%';
+            snowImg.style.height = '100%';
+            snowDiv.appendChild(snowImg);
+            cloudsContainer.appendChild(snowDiv);
+          }
+        }
+      }
+
+      cloudsContainer.appendChild(el);
+    });
+  }
+
+  function render(){
+    const stageSize = Math.min(stage.clientWidth, stage.clientHeight);
+    const cx = stage.clientWidth / 2;
+    const cy = stage.clientHeight / 2;
+    const outerScale = 0.95;
+    const radius = stageSize / 2 * outerScale;
+    const horizonPos = clamp(parseFloat(inputs.horizon.value) || 0.5, 0, 1);
+    const horizonY = stage.clientHeight * horizonPos;
+
+    const sunPos = parsePos(inputs.sunpos.value, 0.2);
+    const moonPos = parsePos(inputs.moonpos.value, 0.7);
+    const heatCode = heatToCode(inputs.heat.value);
+    const moonStateCode = moonStateToCode(inputs.moonstate.value);
+    const sunShape = sunShapeState(sunPos);
+
+    const sunOrbitScale = sunOrbitRadiusDefault;
+    const moonOrbitScale = moonOrbitRadiusDefault;
+    const sunOrbitRadius = radius * sunOrbitScale;
+    const moonOrbitRadius = radius * moonOrbitScale;
+
+    const outerCircle = document.getElementById('outerCircle');
+    const sunOrbitCircle = document.getElementById('sunOrbitCircle');
+    const moonOrbitCircle = document.getElementById('moonOrbitCircle');
+    const horizonLine = document.getElementById('horizonLine');
+    const horizonCover = document.getElementById('horizonCover');
+    const bgRect = document.getElementById('bgRect');
+
+    outerCircle.style.width = `${radius * 2}px`;
+    outerCircle.style.height = `${radius * 2}px`;
+    outerCircle.style.left = `${cx - radius}px`;
+    outerCircle.style.top = `${cy - radius}px`;
+
+    sunOrbitCircle.style.width = `${sunOrbitRadius * 2}px`;
+    sunOrbitCircle.style.height = `${sunOrbitRadius * 2}px`;
+
+    moonOrbitCircle.style.width = `${moonOrbitRadius * 2}px`;
+    moonOrbitCircle.style.height = `${moonOrbitRadius * 2}px`;
+
+    horizonLine.style.top = `${horizonY}px`;
+    horizonCover.style.top = `${horizonY}px`;
+
+    const debugVisibleZone = document.getElementById('debugVisibleZone');
+    const debugSpawnZone = document.getElementById('debugSpawnZone');
+
+    debugVisibleZone.style.top = '0px';
+    debugVisibleZone.style.height = `${horizonY}px`;
+
+    const spawnTop = stage.clientHeight * 0.125;
+    const spawnBottom = stage.clientHeight * 0.417;
+    debugSpawnZone.style.top = `${spawnTop}px`;
+    debugSpawnZone.style.height = `${spawnBottom - spawnTop}px`;
+
+    const bgColor = backgroundForSunPos(sunPos);
+    const bgHex = rgbToHex(bgColor);
+    bgRect.style.height = `${horizonY}px`;
+    bgRect.style.width = `${stage.clientWidth}px`;
+    // exponential-ish falloff: color concentrates near horizon, sky stays white longer
+    const _white = { r: 255, g: 255, b: 255 };
+    const _gradStops = [0, 0.35, 0.6, 0.8, 1.0].map(y => {
+      const t = Math.pow(y, 2.8);
+      const c = mixRgb(_white, bgColor, t);
+      return `${rgbToHex(c)} ${Math.round(y * 100)}%`;
+    });
+    bgRect.style.background = `linear-gradient(to bottom, ${_gradStops.join(', ')})`;
+
+    const sunXY = posToXY(sunPos, sunOrbitRadius, cx, cy);
+    const sunVisible = sunXY.y <= horizonY;
+    sunIcon.style.left = sunXY.x + 'px';
+    sunIcon.style.top = sunXY.y + 'px';
+    sunIcon.style.opacity = 1;
+    const sunFile = `assets/s${sunFrame}${heatCode}${sunShape}.svg`;
+    if (sunImg.getAttribute('data-file') !== sunFile){
+      sunImg.src = sunFile;
+      sunImg.setAttribute('data-file', sunFile);
+    }
+
+    const moonXY = posToXY(moonPos, moonOrbitRadius, cx, cy);
+    const moonVisible = moonXY.y <= horizonY;
+    moonIcon.style.left = moonXY.x + 'px';
+    moonIcon.style.top = moonXY.y + 'px';
+    moonIcon.style.opacity = 1;
+    const moonFile = `assets/m${moonFrame}${moonStateCode}.svg`;
+    if (moonImg.getAttribute('data-file') !== moonFile){
+      moonImg.src = moonFile;
+      moonImg.setAttribute('data-file', moonFile);
+    }
+
+    // NOTE: the original standalone visual.html set document.body's
+    // background/color here, because the stage was the whole page.
+    // In this combined mockup the phone frame must stay black, and
+    // the stage already paints its own sky via #bgRect / the white
+    // covers below the horizon — so that body-level mutation was
+    // removed rather than carried over.
+
+    renderClouds();
+
+    debugEl.innerHTML = `
+      sun &rarr; pos <span>${sunPos.toFixed(3)}</span>,
+      visible <span>${sunVisible}</span>,
+      file <span>${sunFile}</span><br/>
+      moon &rarr; pos <span>${moonPos.toFixed(3)}</span>,
+      visible <span>${moonVisible}</span>,
+      file <span>${moonFile}</span><br/>
+      clouds &rarr; count <span>${clouds.length}/${getCloudTargetCount()}</span>,
+      wind <span>${parseFloat(inputs.windspeed.value).toFixed(1)}</span>,
+      density <span>${clamp(parseFloat(inputs.density.value) || 0.5, 0, 1).toFixed(2)}</span>
+    `;
+  }
+
+  let lastUpdateTime = Date.now();
+  function animationLoop(){
+    const now = Date.now();
+    if (now - lastUpdateTime > 50) {
+      updateClouds(now);
+      render();
+      lastUpdateTime = now;
+    }
+    requestAnimationFrame(animationLoop);
+  }
+
+  window.addEventListener('resize', render);
+
+  function applyWeatherData(weatherData){
+    const mapped = mapWeatherToInputs(weatherData);
+    const flat = {};
+    Object.keys(mapped).forEach(key => { flat[key] = mapped[key].value; });
+    updateWeatherData(flat);
+  }
+
+  window.addEventListener('weatherDataReady', (e) => applyWeatherData(e.detail));
+  window.addEventListener('weatherDataError', (e) => console.error('Weather fetch failed:', e.detail));
+
+  // fetch the currently selected ticker location now, then keep it
+  // refreshed every 10 minutes (switching location via the ticker
+  // triggers its own immediate refetch independently of this timer)
+  window.locationsApi.fetchLocationData(window.locationsApi.getCurrentIndex());
+  setInterval(() => {
+    window.locationsApi.fetchLocationData(window.locationsApi.getCurrentIndex());
+  }, 10 * 60 * 1000);
+
+  render();
+  requestAnimationFrame(animationLoop);
+})();
+</script>
+
+</body>
+</html>

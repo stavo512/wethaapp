@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Time Scroller</title>
+<style>
+  body {
+    background: #fff;
+    color: #000;
+    font-family: Cambria, Georgia, "Times New Roman", serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    margin: 0;
+  }
+
+  .stack {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .ticker {
+    position: relative;
+    width: 800px;
+    height: 100px;
+    background: #fff;
+    border: 4px solid #ffe600;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+  }
+
+  .ticker-arrow {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: opacity 0.15s ease;
+  }
+
+  .ticker-arrow .tri {
+    width: 0;
+    height: 0;
+    border-top: 10px solid transparent;
+    border-bottom: 10px solid transparent;
+  }
+
+  .ticker-arrow.left .tri {
+    border-right: 16px solid #000;
+  }
+
+  .ticker-arrow.right .tri {
+    border-left: 16px solid #000;
+  }
+
+  .ticker-text {
+    font-size: 19px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 8px;
+    white-space: nowrap;
+    transition: opacity 0.15s ease;
+  }
+
+  .picker {
+    position: relative;
+    width: 800px;
+    height: 400px;
+    border: 4px solid #1a5fff;
+    box-sizing: border-box;
+    overflow: hidden;
+    background: #fff;
+    cursor: grab;
+    user-select: none;
+    touch-action: none;
+  }
+
+  .picker.dragging {
+    cursor: grabbing;
+  }
+
+  .dot {
+    position: absolute;
+    top: 0;
+    left: 0;
+    background: #000;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+  }
+
+  .label {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    transform: translateY(-50%);
+    font-size: 38px;
+    line-height: 1;
+    font-weight: bold;
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.08s linear;
+  }
+
+  .pointer {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    width: 0;
+    height: 0;
+    border-top: 9px solid transparent;
+    border-bottom: 9px solid transparent;
+    border-left: 28px solid #000;
+    transform: translateY(-50%);
+  }
+</style>
+</head>
+<body>
+
+<div class="stack">
+
+  <div class="ticker" id="ticker">
+    <div class="ticker-arrow left" id="tickerLeft"><div class="tri"></div></div>
+    <div class="ticker-text" id="tickerText"></div>
+    <div class="ticker-arrow right" id="tickerRight"><div class="tri"></div></div>
+  </div>
+
+  <div class="picker" id="picker">
+    <div class="pointer" id="pointer"></div>
+    <div class="label" id="label"></div>
+  </div>
+
+</div>
+
+<script>
+  const picker = document.getElementById('picker');
+  const labelEl = document.getElementById('label');
+  const pointerEl = document.getElementById('pointer');
+
+  // ---- time logic ----
+  function getBaseHour(now) {
+    const d = new Date(now);
+    const mins = d.getMinutes();
+    d.setMinutes(0, 0, 0);
+    if (mins >= 30) d.setHours(d.getHours() + 1);
+    return d;
+  }
+
+  function buildSlots() {
+    const base = getBaseHour(new Date());
+    const offsets = [0, 1, 2, 3, 4, 6, 8]; // hours from base
+    const labels = ['now', 'in one hour', 'in two hours', 'in three hours',
+                     'in four hours', 'in six hours', 'in eight hours'];
+
+    const slots = offsets.map((h, i) => {
+      const t = new Date(base);
+      t.setHours(t.getHours() + h);
+      return { label: labels[i], time: t };
+    });
+
+    // tomorrow at 12:00
+    const tomorrow = new Date(base);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(12, 0, 0, 0);
+    slots.push({ label: 'tomorrow', time: tomorrow });
+
+    return slots;
+  }
+
+  const slots = buildSlots(); // 8 entries: index 0 = now, index 7 = tomorrow
+
+  // ---- layout constants ----
+  // Non-linear vertical spacing: gaps shrink the further a dot is
+  // from the selected (big) one, so all 8 dots always fit in view.
+  const SPACING_BASE = 80;
+  const BIG_D = 34;   // selected dot diameter
+  const MIN_D = 8;    // floor diameter for distant dots
+  const SIZE_DECAY = 0.4; // direct neighbour ends up at exactly 40% of BIG_D
+  const MIN_OFFSET = 0;     // "now" at anchor
+  const MAX_OFFSET = slots.length - 1; // "tomorrow" at anchor
+  const LABEL_SHOW_THRESHOLD = 0.12; // how close to a dot before label appears
+
+  // Horizontal layout
+  const GROUP_SHIFT_FRACTION = 0.25; // whole group shifted left by 25% of rect width
+  const TRIANGLE_LEN = 28;           // horizontal length of the pointer triangle
+  const TRIANGLE_HALF = TRIANGLE_LEN / 2;
+  const GAP_TIP_TO_DOT = 8;          // gap between triangle tip and the dot
+  const GAP_LABEL_FROM_DOT = 30;     // gap between dot and start of label text
+  const LABEL_VERTICAL_NUDGE = { now: -3 }; // px correction; "now" has no ascenders/descenders so centers slightly low
+
+  function signedOffset(x) {
+    // smooth, monotonic, but with diminishing spacing as |x| grows
+    return Math.sign(x) * SPACING_BASE * Math.log(1 + Math.abs(x));
+  }
+
+  function dotSize(d) {
+    const s = BIG_D * Math.pow(SIZE_DECAY, d);
+    return Math.max(MIN_D, s);
+  }
+
+  let scrollOffset = 0; // 0..7, continuous
+  let snapAnim = null;  // active requestAnimationFrame id, if snapping
+
+  // create dot elements
+  const dotEls = slots.map(() => {
+    const el = document.createElement('div');
+    el.className = 'dot';
+    picker.appendChild(el);
+    return el;
+  });
+
+  function render() {
+    const W = picker.clientWidth;
+    // clientHeight excludes the border, matching the coordinate
+    // space that absolutely-positioned children are placed in.
+    const H = picker.clientHeight;
+    const anchorY = H / 2;
+    const dotCenterX = W * (0.5 - GROUP_SHIFT_FRACTION) - 1.5 * TRIANGLE_LEN + 2 * TRIANGLE_LEN + 0.75 * TRIANGLE_LEN + 1 * TRIANGLE_LEN; // whole group shifted
+
+    let nearestIndex = 0;
+    let nearestDist = Infinity;
+
+    dotEls.forEach((el, i) => {
+      const x = i - scrollOffset;
+      const dist = Math.abs(x);
+      const y = anchorY + signedOffset(x);
+      const size = dotSize(dist);
+
+      el.style.top = y + 'px';
+      el.style.left = (dotCenterX + TRIANGLE_LEN) + 'px';
+      el.style.width = size + 'px';
+      el.style.height = size + 'px';
+
+      if (dist < nearestDist) {
+        nearestDist = dist;
+        nearestIndex = i;
+      }
+    });
+
+    if (nearestDist < LABEL_SHOW_THRESHOLD) {
+      const lbl = slots[nearestIndex].label;
+      labelEl.textContent = lbl;
+      labelEl.style.opacity = '1';
+      labelEl.style.top = (anchorY + (LABEL_VERTICAL_NUDGE[lbl] || 0)) + 'px';
+    } else {
+      labelEl.style.opacity = '0';
+    }
+    labelEl.style.left = (dotCenterX + GAP_LABEL_FROM_DOT - TRIANGLE_HALF + 2 * TRIANGLE_LEN) + 'px';
+
+    pointerEl.style.top = anchorY + 'px';
+    pointerEl.style.left = (dotCenterX - GAP_TIP_TO_DOT - TRIANGLE_LEN - TRIANGLE_HALF) + 'px';
+  }
+
+  // ---- snapping ----
+  function easeOutCubic(x) {
+    return 1 - Math.pow(1 - x, 3);
+  }
+
+  function cancelSnap() {
+    if (snapAnim !== null) {
+      cancelAnimationFrame(snapAnim);
+      snapAnim = null;
+    }
+  }
+
+  function snapToNearest() {
+    const target = Math.round(scrollOffset);
+    const start = scrollOffset;
+    const distance = target - start;
+    if (distance === 0) { render(); return; }
+
+    const duration = 180; // ms
+    const startTime = performance.now();
+
+    function step(now) {
+      const elapsed = now - startTime;
+      const p = Math.min(1, elapsed / duration);
+      scrollOffset = start + distance * easeOutCubic(p);
+      render();
+      if (p < 1) {
+        snapAnim = requestAnimationFrame(step);
+      } else {
+        scrollOffset = target;
+        render();
+        snapAnim = null;
+      }
+    }
+    snapAnim = requestAnimationFrame(step);
+  }
+
+  // ---- drag handling ----
+  let dragging = false;
+  let startY = 0;
+  let startOffset = 0;
+
+  function clamp(v) {
+    return Math.min(MAX_OFFSET, Math.max(MIN_OFFSET, v));
+  }
+
+  picker.addEventListener('pointerdown', (e) => {
+    cancelSnap();
+    dragging = true;
+    picker.classList.add('dragging');
+    startY = e.clientY;
+    startOffset = scrollOffset;
+    picker.setPointerCapture(e.pointerId);
+  });
+
+  picker.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    const deltaY = e.clientY - startY;
+    scrollOffset = clamp(startOffset - deltaY / SPACING_BASE);
+    render();
+  });
+
+  function endDrag(e) {
+    if (!dragging) return;
+    dragging = false;
+    picker.classList.remove('dragging');
+    snapToNearest();
+  }
+
+  picker.addEventListener('pointerup', endDrag);
+  picker.addEventListener('pointercancel', endDrag);
+
+  render();
+  window.addEventListener('resize', render);
+
+  // ===================================================================
+  // TICKER (yellow rectangle) — EDIT THE LIST BELOW, that's it.
+  // Any casing is fine, it's displayed in CAPS automatically.
+  // ===================================================================
+  const TICKER_LIST = [
+    'Sunny',
+    'Partly Cloudy',
+    'Cloudy',
+    'Rain',
+    'Thunderstorms',
+    'Snow',
+    'Fog',
+    'Windy'
+  ];
+  // ===================================================================
+
+  const tickerTextEl = document.getElementById('tickerText');
+  const tickerLeftEl = document.getElementById('tickerLeft');
+  const tickerRightEl = document.getElementById('tickerRight');
+
+  let tickerIndex = 0;
+  let tickerTransitioning = false;
+  const TICKER_FADE_MS = 150;
+
+  function renderTicker() {
+    tickerTextEl.textContent = TICKER_LIST[tickerIndex];
+  }
+
+  function switchTicker(step) {
+    if (tickerTransitioning) return;
+    tickerTransitioning = true;
+
+    tickerTextEl.style.opacity = '0';
+    tickerLeftEl.style.opacity = '0';
+    tickerRightEl.style.opacity = '0';
+
+    setTimeout(() => {
+      tickerIndex = (tickerIndex + step + TICKER_LIST.length) % TICKER_LIST.length;
+      renderTicker();
+
+      tickerTextEl.style.opacity = '1';
+      tickerLeftEl.style.opacity = '1';
+      tickerRightEl.style.opacity = '1';
+
+      tickerTransitioning = false;
+    }, TICKER_FADE_MS);
+  }
+
+  tickerLeftEl.addEventListener('click', () => switchTicker(-1));
+  tickerRightEl.addEventListener('click', () => switchTicker(1));
+
+  renderTicker();
+</script>
+
+</body>
+</html>

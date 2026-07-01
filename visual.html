@@ -1,0 +1,821 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Sun/Moon + Clouds Test</title>
+<style>
+  :root{
+    --bg:#ffffff;
+    --panel:#0c1320;
+    --line:rgba(255,255,255,0.18);
+    --text:#f4f0e6;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    min-height:100vh;
+    background:#ffffff;
+    color:var(--text);
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:24px 16px;
+  }
+  h1{
+    font-size:14px;
+    text-transform:uppercase;
+    letter-spacing:0.08em;
+    opacity:0.6;
+    margin:0 0 18px;
+  }
+  .stage{
+    position:relative;
+    width:480px;
+    height:480px;
+    max-width:100%;
+    overflow:hidden;
+    background:inherit;
+  }
+  .circle-outline{
+    position:absolute;
+    border:1px dashed rgba(255,255,255,0.25);
+    border-radius:50%;
+    display:none;
+  }
+  .orbit-circle{
+    position:absolute;
+    left:50%;
+    top:50%;
+    width:100%;
+    height:100%;
+    transform:translate(-50%, -50%);
+    border:3px solid #d4c5a9;
+    border-radius:50%;
+    pointer-events:none;
+  }
+  .debug-spawn-zone{
+    position:absolute;
+    left:15%;
+    right:15%;
+    width:70%;
+    background:rgba(255, 0, 0, 0.15);
+    border:2px solid rgba(255, 0, 0, 0.5);
+    pointer-events:none;
+    z-index:0;
+    display:none;
+  }
+  .bottom-white-cover{
+    position:absolute;
+    left:0;
+    right:0;
+    top:50%;
+    bottom:0;
+    background:#ffffff;
+    pointer-events:none;
+    z-index:2;
+  }
+  .debug-visible-zone{
+    position:absolute;
+    left:0;
+    right:0;
+    top:0;
+    background:rgba(255, 192, 203, 0.08);
+    border:2px solid rgba(255, 192, 203, 0.4);
+    pointer-events:none;
+    z-index:0;
+    display:none;
+  }
+  .horizon{
+    position:absolute;
+    left:0;
+    right:0;
+    top:50%;
+    height:4px;
+    background:#d4c5a9;
+    z-index:3;
+  }
+  .bg-rect{
+    position:absolute;
+    left:0;
+    right:0;
+    top:0;
+    z-index:0;
+    pointer-events:none;
+  }
+  .cloud-spawn-rect{
+    position:absolute;
+    left:0;
+    right:0;
+    top:0;
+    bottom:0;
+    border:2px dashed rgba(100, 200, 255, 0.3);
+    pointer-events:none;
+    z-index:0;
+    display:none;
+  }
+  .horizon-cover{
+    position:absolute;
+    left:0;
+    right:0;
+    top:50%;
+    bottom:0;
+    background:var(--bg);
+    pointer-events:none;
+    z-index:2;
+    display:none;
+  }
+  .top-half-tint{
+    position:absolute;
+    left:0; right:0; top:0; height:50%;
+    background:rgba(255,255,255,0.03);
+    border-radius:240px 240px 0 0;
+    display:none;
+  }
+  .body-icon{
+    position:absolute;
+    width:140px;
+    height:140px;
+    transform:translate(-50%,-50%);
+    pointer-events:none;
+    transition:opacity 0.15s linear;
+  }
+  .body-icon#moonIcon{
+    width:118px;
+    height:118px;
+  }
+  .body-icon img{
+    width:100%;
+    height:100%;
+    display:block;
+  }
+
+  /* cloud layer */
+  .clouds-container{
+    position:absolute;
+    left:0; top:0; right:0; bottom:0;
+    pointer-events:none;
+    z-index:1;
+  }
+  .cloud-item{
+    position:absolute;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  }
+  .cloud-img{
+    width:100%;
+    height:100%;
+    display:block;
+  }
+  .cloud-precip{
+    position:absolute;
+    width:100%;
+    height:100%;
+    display:block;
+  }
+  .cloud-snow-overlay{
+    position:fixed;
+    pointer-events:none;
+    z-index:1;
+  }
+
+  .panel{
+    margin-top:28px;
+    width:480px;
+    max-width:100%;
+    background:var(--panel);
+    border-radius:16px;
+    padding:18px 20px;
+    border:1px solid rgba(255,255,255,0.06);
+    display:none;
+  }
+  .row{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    margin-bottom:12px;
+  }
+  .row:last-child{ margin-bottom:0; }
+  .row label{
+    width:90px;
+    font-size:13px;
+    opacity:0.8;
+    flex-shrink:0;
+  }
+  .row input[type="text"]{
+    flex:1;
+    background:#1a2236;
+    border:1px solid rgba(255,255,255,0.1);
+    color:var(--text);
+    padding:8px 10px;
+    border-radius:8px;
+    font-size:14px;
+    font-variant-numeric: tabular-nums;
+  }
+  .row .hint{
+    font-size:11px;
+    opacity:0.45;
+    width:170px;
+    flex-shrink:0;
+  }
+  .debug{
+    margin-top:28px;
+    width:480px;
+    max-width:100%;
+    font-size:12px;
+    opacity:0.55;
+    line-height:1.6;
+    font-variant-numeric: tabular-nums;
+    display:none;
+  }
+  .debug span{ color:#ff8a3d; }
+</style>
+</head>
+<body>
+
+<div class="stage" id="stage">
+  <div class="bg-rect" id="bgRect"></div>
+  <div class="top-half-tint"></div>
+  <div class="debug-visible-zone" id="debugVisibleZone"></div>
+  <div class="debug-spawn-zone" id="debugSpawnZone"></div>
+  <div class="cloud-spawn-rect" id="cloudSpawnRect"></div>
+  <div class="circle-outline" id="outerCircle"></div>
+  <div class="orbit-circle" id="sunOrbitCircle"></div>
+  <div class="orbit-circle" id="moonOrbitCircle"></div>
+  
+  <!-- clouds layer -->
+  <div class="clouds-container" id="cloudsContainer"></div>
+
+  <div class="horizon-cover" id="horizonCover"></div>
+  <div class="horizon" id="horizonLine"></div>
+  <div class="body-icon" id="sunIcon"><img id="sunImg" src="" alt="sun" /></div>
+  <div class="body-icon" id="moonIcon"><img id="moonImg" src="" alt="moon" /></div>
+  <div class="bottom-white-cover"></div>
+</div>
+
+<div class="panel">
+  <div class="row">
+    <label for="sunpos">sunpos</label>
+    <input type="text" id="sunpos" value="0.20" />
+    <span class="hint">0 = top, 0.5 = bottom</span>
+  </div>
+  <div class="row">
+    <label for="moonpos">moonpos</label>
+    <input type="text" id="moonpos" value="0.70" />
+    <span class="hint">0 = top, 0.5 = bottom</span>
+  </div>
+  <div class="row">
+    <label for="heat">heat</label>
+    <input type="text" id="heat" value="2" />
+    <span class="hint">1 cold &middot; 2 medium &middot; 3 hot</span>
+  </div>
+  <div class="row">
+    <label for="moonstate">moonstate</label>
+    <input type="text" id="moonstate" value="4" />
+    <span class="hint">1 to 8</span>
+  </div>
+  <div class="row">
+    <label for="horizon">horizon</label>
+    <input type="text" id="horizon" value="0.50" />
+    <span class="hint">0 = top, 0.5 = middle, 1 = bottom</span>
+  </div>
+  
+  <!-- cloud controls -->
+  <div style="margin-top:20px; padding-top:20px; border-top:1px solid rgba(255,255,255,0.06);">
+    <div class="row">
+      <label for="windspeed">windspeed</label>
+      <input type="text" id="windspeed" value="2" />
+      <span class="hint">0 to 5</span>
+    </div>
+    <div class="row">
+      <label for="direction">direction</label>
+      <input type="text" id="direction" value="L" />
+      <span class="hint">L or R</span>
+    </div>
+    <div class="row">
+      <label for="density">density</label>
+      <input type="text" id="density" value="0.5" />
+      <span class="hint">0 to 1</span>
+    </div>
+    <div class="row">
+      <label for="precipitation">precip</label>
+      <input type="text" id="precipitation" value="N" />
+      <span class="hint">N R H S</span>
+    </div>
+  </div>
+</div>
+
+<div class="debug" id="debug"></div>
+
+<script src="weather-data.js"></script>
+<script src="weather-to-inputs.js"></script>
+<script>
+(function(){
+  const stage = document.getElementById('stage');
+  const cloudsContainer = document.getElementById('cloudsContainer');
+  const sunIcon = document.getElementById('sunIcon');
+  const moonIcon = document.getElementById('moonIcon');
+  const sunImg = document.getElementById('sunImg');
+  const moonImg = document.getElementById('moonImg');
+  const debugEl = document.getElementById('debug');
+
+  // Default values - these will be set by external data source in next step
+  const inputs = {
+    sunpos: { value: '0.85' },
+    moonpos: { value: '0.40' },
+    heat: { value: '3' },
+    moonstate: { value: '7' },
+    horizon: { value: '0.50' },
+    windspeed: { value: '2' },
+    direction: { value: 'L' },
+    density: { value: '0.2' },
+    precipitation: { value: 'R' },
+  };
+
+  // Function to update values from external data
+  function updateWeatherData(data) {
+    if (data.sunpos !== undefined) inputs.sunpos.value = data.sunpos;
+    if (data.moonpos !== undefined) inputs.moonpos.value = data.moonpos;
+    if (data.heat !== undefined) inputs.heat.value = data.heat;
+    if (data.moonstate !== undefined) inputs.moonstate.value = data.moonstate;
+    if (data.horizon !== undefined) inputs.horizon.value = data.horizon;
+    if (data.windspeed !== undefined) inputs.windspeed.value = data.windspeed;
+    if (data.direction !== undefined) inputs.direction.value = data.direction;
+    if (data.density !== undefined) inputs.density.value = data.density;
+    if (data.precipitation !== undefined) inputs.precipitation.value = data.precipitation;
+    render();
+  }
+
+  // default orbit radius values (no longer editable via UI)
+  const sunOrbitRadiusDefault = 0.61;
+  const moonOrbitRadiusDefault = 0.86;
+
+  // ---- sketch-frame auto-cycling ----
+  let sunFrame = 'v1';
+  let moonFrame = 'v1';
+  let cloudFrame = 'f1';
+  let precipFrame = '1';
+
+  const SUN_FRAMES = ['v1','v2'];
+  const MOON_FRAMES = ['v1','v2','v3'];
+  const CLOUD_FRAMES = ['f1','f2'];
+  const PRECIP_FRAMES = ['1','2','3','4'];
+
+  let sunFrameIdx = 0, moonFrameIdx = 0, cloudFrameIdx = 0, precipFrameIdx = 0;
+
+  setInterval(()=>{
+    sunFrameIdx = (sunFrameIdx+1) % SUN_FRAMES.length;
+    sunFrame = SUN_FRAMES[sunFrameIdx];
+    render();
+  }, 700);
+
+  setInterval(()=>{
+    moonFrameIdx = (moonFrameIdx+1) % MOON_FRAMES.length;
+    moonFrame = MOON_FRAMES[moonFrameIdx];
+    render();
+  }, 900);
+
+  setInterval(()=>{
+    cloudFrameIdx = (cloudFrameIdx+1) % CLOUD_FRAMES.length;
+    cloudFrame = CLOUD_FRAMES[cloudFrameIdx];
+    render();
+  }, 650);
+
+  setInterval(()=>{
+    precipFrameIdx = (precipFrameIdx+1) % PRECIP_FRAMES.length;
+    precipFrame = PRECIP_FRAMES[precipFrameIdx];
+    render();
+  }, 400);
+
+  // ---- cloud management ----
+  let activeCloudId = 0;
+  let clouds = [];
+  let snowOverlayId = null;
+
+  function generateCloudId(){
+    return 'cloud-' + (++activeCloudId);
+  }
+
+  function getCloudTargetCount(){
+    const dens = clamp(parseFloat(inputs.density.value) || 0.5, 0, 1);
+    const minClouds = 1, maxClouds = 5;
+    return Math.round(minClouds + (maxClouds - minClouds) * dens);
+  }
+
+  function getCloudSize(density){
+    // low density = more small, high density = more big
+    // density 0-0.5 leans small, 0.5-1 leans big
+    const r = Math.random();
+    if (density < 0.33) return r < 0.85 ? 's' : 'b';
+    if (density < 0.66) return r < 0.5 ? 's' : 'b';
+    return r < 0.3 ? 's' : 'b';
+  }
+
+  function getCloudType(){
+    const precipType = (inputs.precipitation.value || 'N').toUpperCase();
+    // if no precip, only friendly clouds; if precip active, only precip clouds
+    return precipType === 'N' ? 'f' : 'p';
+  }
+
+  function getCloudSizeMultiplier(){
+    // random between 1.0 (100%) and 2.0 (200%) increase
+    return 1 + Math.random();
+  }
+
+  function spawnCloud(timestamp){
+    const density = clamp(parseFloat(inputs.density.value) || 0.5, 0, 1);
+    const size = getCloudSize(density);
+    const type = getCloudType();
+    const sizeMultiplier = getCloudSizeMultiplier();
+
+    const stageH = stage.clientHeight;
+    const stageW = stage.clientWidth;
+    const minY = stageH * 0.125; // 12.5% up from top
+    const maxY = stageH * 0.417; // 41.7% up from top
+    const y = minY + Math.random() * (maxY - minY);
+
+    // spawn at random X within the rectangle bounds (15% to 85%)
+    const minX = stageW * 0.15;
+    const maxX = stageW * 0.85;
+    const x = minX + Math.random() * (maxX - minX);
+
+    const dir = (inputs.direction.value || 'L').toUpperCase();
+    const isMovingRight = dir === 'R';
+
+    const cloud = {
+      id: generateCloudId(),
+      type,
+      size,
+      sizeMultiplier,
+      x,
+      y,
+      spawnTime: timestamp,
+      isMovingRight,
+      state: 'spawn', // 'spawn', 'active', 'despawn'
+      stateStartTime: timestamp,
+    };
+    clouds.push(cloud);
+    return cloud;
+  }
+
+  function updateClouds(timestamp){
+    const windspeed = clamp(parseFloat(inputs.windspeed.value) || 0, 0, 5);
+    const direction = (inputs.direction.value || 'L').toUpperCase();
+    const density = clamp(parseFloat(inputs.density.value) || 0.5, 0, 1);
+    const targetCount = getCloudTargetCount();
+
+    // spawn new clouds if below target
+    if (clouds.length < targetCount && Math.random() < 0.03) {
+      spawnCloud(timestamp);
+    }
+
+    // update positions & state transitions
+    const stageW = stage.clientWidth;
+    const transitionDuration = 800; // ms for spawn/despawn transition with 't' frame
+
+    clouds = clouds.filter(cloud => {
+      // movement
+      if (windspeed > 0) {
+        const speed = 0.8 + (windspeed / 5) * 1.2;
+        const dx = cloud.isMovingRight ? speed : -speed;
+        cloud.x += dx;
+      }
+
+      // state machine
+      const elapsed = timestamp - cloud.stateStartTime;
+
+      if (cloud.state === 'spawn') {
+        if (elapsed > transitionDuration) {
+          cloud.state = 'active';
+          cloud.stateStartTime = timestamp;
+        }
+      } else if (cloud.state === 'active') {
+        const stageW = stage.clientWidth;
+        const rectLeft = stageW * 0.15;
+        const rectRight = stageW * 0.85;
+        // despawn when cloud reaches rectangle edges
+        const isLeavingRect = (cloud.isMovingRight && cloud.x > rectRight) ||
+                              (!cloud.isMovingRight && cloud.x < rectLeft);
+        if (isLeavingRect) {
+          cloud.state = 'despawn';
+          cloud.stateStartTime = timestamp;
+        }
+      }
+
+      // remove if fully despawned - use fresh elapsed for despawn state
+      if (cloud.state === 'despawn') {
+        const despawnElapsed = timestamp - cloud.stateStartTime;
+        if (despawnElapsed > transitionDuration) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }
+
+  // ---- helpers ----
+  function clamp(v, lo, hi){ return Math.min(hi, Math.max(lo, v)); }
+
+  function parsePos(raw, fallback){
+    let v = parseFloat(raw);
+    if (isNaN(v)) v = fallback;
+    v = v % 1;
+    if (v < 0) v += 1;
+    return v;
+  }
+
+  function posToXY(pos, radius, cx, cy){
+    const angle = pos * Math.PI * 2;
+    const x = cx + Math.sin(angle) * radius;
+    const y = cy - Math.cos(angle) * radius;
+    return { x, y };
+  }
+
+  function sunShapeState(pos){
+    if (pos <= 0.1 || pos >= 0.9) return 's3';
+    if (pos >= 0.2 && pos <= 0.8) return 's1';
+    return 's2';
+  }
+
+  function heatToCode(heatRaw){
+    let h = Math.round(clamp(parseFloat(heatRaw) || 2, 1, 3));
+    return { 1:'c', 2:'m', 3:'h' }[h];
+  }
+
+  function rgbToHex({r,g,b}){
+    const toHex = v => Math.round(v).toString(16).padStart(2, '0');
+    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+  }
+
+  function mixRgb(a, b, t){
+    return {
+      r: a.r + (b.r - a.r) * t,
+      g: a.g + (b.g - a.g) * t,
+      b: a.b + (b.b - a.b) * t,
+    };
+  }
+
+  function backgroundForSunPos(pos){
+    const dark = { r: 16, g: 24, b: 43 };
+    const white = { r: 255, g: 255, b: 255 };
+    if (pos <= 0.2 || pos >= 0.8) return white;
+    if (pos >= 0.3 && pos <= 0.7) return dark;
+    const t = pos < 0.3 ? (pos - 0.2) / 0.1 : (0.8 - pos) / 0.1;
+    let color = mixRgb(white, dark, t);
+    const isRedHint = Math.abs(pos - 0.25) < 0.001 || Math.abs(pos - 0.75) < 0.001;
+    if (isRedHint) {
+      color.r = Math.min(255, color.r + 32);
+      color.g = Math.max(0, color.g - 16);
+      color.b = Math.max(0, color.b - 16);
+    }
+    return color;
+  }
+
+  function isLightColor({r,g,b}){
+    return (r * 0.299 + g * 0.587 + b * 0.114) > 186;
+  }
+
+  function moonStateToCode(stateRaw){
+    let s = Math.round(clamp(parseFloat(stateRaw) || 1, 1, 8));
+    return 's' + s;
+  }
+
+  function getPrecipCode(precipType){
+    const type = (precipType || 'N').toUpperCase();
+    const windspeed = clamp(parseFloat(inputs.windspeed.value) || 0, 0, 5);
+    const isMoving = windspeed > 2;
+
+    switch(type){
+      case 'R': return isMoving ? 'm' : 'r';
+      case 'H': return isMoving ? 'n' : 'h';
+      case 'S': return 's';
+      default: return null;
+    }
+  }
+
+  function renderClouds(){
+    const windspeed = clamp(parseFloat(inputs.windspeed.value) || 0, 0, 5);
+    const direction = (inputs.direction.value || 'L').toUpperCase();
+    const precipType = (inputs.precipitation.value || 'N').toUpperCase();
+    const isMoving = windspeed > 2;
+
+    cloudsContainer.innerHTML = '';
+
+    clouds.forEach(cloud => {
+      const baseW = cloud.size === 'b' ? 220 : 140;
+      const baseH = cloud.size === 'b' ? 130 : 85;
+      const cloudW = baseW * cloud.sizeMultiplier;
+      const cloudH = baseH * cloud.sizeMultiplier;
+
+      // determine frame to show based on state
+      let frame;
+      if (cloud.state === 'spawn' || cloud.state === 'despawn') {
+        frame = 't'; // transition frame
+      } else {
+        frame = isMoving ? cloudFrame : cloudFrame; // use current cycling frame
+      }
+
+      // determine state (still vs moving) - but always use 's' for transition frames
+      const state = (cloud.state === 'spawn' || cloud.state === 'despawn') ? 's' : (isMoving ? 'm' : 's');
+
+      // build cloud filename
+      const cloudFile = `assets/clouds/c${cloud.type}${cloud.size}${state}${frame}.svg`;
+
+      const el = document.createElement('div');
+      el.className = 'cloud-item';
+      el.style.left = (cloud.x - cloudW / 2) + 'px';
+      el.style.top = (cloud.y - cloudH / 2) + 'px';
+      el.style.width = cloudW + 'px';
+      el.style.height = cloudH + 'px';
+
+      if (direction === 'R') {
+        el.style.transform = 'scaleX(-1)';
+      } else if (cloud.state === 'despawn') {
+        // flip transition frame when despawning left
+        el.style.transform = 'scaleX(-1)';
+      }
+
+      const img = document.createElement('img');
+      img.src = cloudFile;
+      img.className = 'cloud-img';
+      el.appendChild(img);
+
+      // add precip overlay if this is a precip cloud and precip is active
+      if (cloud.type === 'p' && precipType !== 'N') {
+        const precipCode = getPrecipCode(precipType);
+        if (precipCode) {
+          const precipFile = `assets/clouds/p${cloud.size}${precipCode}${precipFrame}.svg`;
+          const precipEl = document.createElement('img');
+          precipEl.src = precipFile;
+          precipEl.className = 'cloud-precip';
+          el.appendChild(precipEl);
+
+          // special snow handling: fixed position overlay in stage space
+          if (precipCode === 's') {
+            // create a separate snow overlay positioned in the stage
+            const snowDiv = document.createElement('div');
+            snowDiv.className = 'cloud-snow-overlay';
+            snowDiv.style.position = 'absolute';
+            snowDiv.style.left = (cloud.x - 70) + 'px';
+            snowDiv.style.top = (cloud.y + cloudH / 2) + 'px';
+            snowDiv.style.width = '140px';
+            snowDiv.style.height = '80px';
+            snowDiv.style.pointerEvents = 'none';
+            snowDiv.style.zIndex = '1';
+
+            const snowImg = document.createElement('img');
+            snowImg.src = `assets/clouds/p${cloud.size}${precipCode}${precipFrame}.svg`;
+            snowImg.style.width = '100%';
+            snowImg.style.height = '100%';
+            snowDiv.appendChild(snowImg);
+            cloudsContainer.appendChild(snowDiv);
+          }
+        }
+      }
+
+      cloudsContainer.appendChild(el);
+    });
+  }
+
+  function render(){
+    const stageSize = Math.min(stage.clientWidth, stage.clientHeight);
+    const cx = stage.clientWidth / 2;
+    const cy = stage.clientHeight / 2;
+    const outerScale = 0.95;
+    const radius = stageSize / 2 * outerScale;
+    const horizonPos = clamp(parseFloat(inputs.horizon.value) || 0.5, 0, 1);
+    const horizonY = stage.clientHeight * horizonPos;
+
+    const sunPos = parsePos(inputs.sunpos.value, 0.2);
+    const moonPos = parsePos(inputs.moonpos.value, 0.7);
+    const heatCode = heatToCode(inputs.heat.value);
+    const moonStateCode = moonStateToCode(inputs.moonstate.value);
+    const sunShape = sunShapeState(sunPos);
+
+    const sunOrbitScale = sunOrbitRadiusDefault;
+    const moonOrbitScale = moonOrbitRadiusDefault;
+    const sunOrbitRadius = radius * sunOrbitScale;
+    const moonOrbitRadius = radius * moonOrbitScale;
+
+    // -- layout --
+    const outerCircle = document.getElementById('outerCircle');
+    const sunOrbitCircle = document.getElementById('sunOrbitCircle');
+    const moonOrbitCircle = document.getElementById('moonOrbitCircle');
+    const horizonLine = document.getElementById('horizonLine');
+    const horizonCover = document.getElementById('horizonCover');
+    const bgRect = document.getElementById('bgRect');
+
+    outerCircle.style.width = `${radius * 2}px`;
+    outerCircle.style.height = `${radius * 2}px`;
+    outerCircle.style.left = `${cx - radius}px`;
+    outerCircle.style.top = `${cy - radius}px`;
+
+    sunOrbitCircle.style.width = `${sunOrbitRadius * 2}px`;
+    sunOrbitCircle.style.height = `${sunOrbitRadius * 2}px`;
+
+    moonOrbitCircle.style.width = `${moonOrbitRadius * 2}px`;
+    moonOrbitCircle.style.height = `${moonOrbitRadius * 2}px`;
+
+    horizonLine.style.top = `${horizonY}px`;
+    horizonCover.style.top = `${horizonY}px`;
+
+    // debug zones
+    const debugVisibleZone = document.getElementById('debugVisibleZone');
+    const debugSpawnZone = document.getElementById('debugSpawnZone');
+    
+    // pink zone: 0 to horizon (visible area for clouds)
+    debugVisibleZone.style.top = '0px';
+    debugVisibleZone.style.height = `${horizonY}px`;
+    
+    // red zone: 12.5% to 41.7% (spawn area, moved down 33% toward horizon)
+    const spawnTop = stage.clientHeight * 0.125;
+    const spawnBottom = stage.clientHeight * 0.417;
+    debugSpawnZone.style.top = `${spawnTop}px`;
+    debugSpawnZone.style.height = `${spawnBottom - spawnTop}px`;
+
+    const bgColor = backgroundForSunPos(sunPos);
+    const bgHex = rgbToHex(bgColor);
+    bgRect.style.height = `${horizonY}px`;
+    bgRect.style.background = `linear-gradient(to bottom, #ffffff 0%, ${bgHex} 100%)`;
+    bgRect.style.width = `${stage.clientWidth}px`;
+
+    // -- sun --
+    const sunXY = posToXY(sunPos, sunOrbitRadius, cx, cy);
+    const sunVisible = sunXY.y <= horizonY;
+    sunIcon.style.left = sunXY.x + 'px';
+    sunIcon.style.top = sunXY.y + 'px';
+    sunIcon.style.opacity = 1;
+    const sunFile = `assets/s${sunFrame}${heatCode}${sunShape}.svg`;
+    if (sunImg.getAttribute('data-file') !== sunFile){
+      sunImg.src = sunFile;
+      sunImg.setAttribute('data-file', sunFile);
+    }
+
+    // -- moon --
+    const moonXY = posToXY(moonPos, moonOrbitRadius, cx, cy);
+    const moonVisible = moonXY.y <= horizonY;
+    moonIcon.style.left = moonXY.x + 'px';
+    moonIcon.style.top = moonXY.y + 'px';
+    moonIcon.style.opacity = 1;
+    const moonFile = `assets/m${moonFrame}${moonStateCode}.svg`;
+    if (moonImg.getAttribute('data-file') !== moonFile){
+      moonImg.src = moonFile;
+      moonImg.setAttribute('data-file', moonFile);
+    }
+
+    document.body.style.background = 'var(--bg)';
+    document.body.style.color = isLightColor(bgColor) ? '#10182b' : '#f4f0e6';
+
+    // -- clouds --
+    renderClouds();
+
+    debugEl.innerHTML = `
+      sun &rarr; pos <span>${sunPos.toFixed(3)}</span>,
+      visible <span>${sunVisible}</span>,
+      file <span>${sunFile}</span><br/>
+      moon &rarr; pos <span>${moonPos.toFixed(3)}</span>,
+      visible <span>${moonVisible}</span>,
+      file <span>${moonFile}</span><br/>
+      clouds &rarr; count <span>${clouds.length}/${getCloudTargetCount()}</span>,
+      wind <span>${parseFloat(inputs.windspeed.value).toFixed(1)}</span>,
+      density <span>${clamp(parseFloat(inputs.density.value) || 0.5, 0, 1).toFixed(2)}</span>
+    `;
+  }
+
+  let lastUpdateTime = Date.now();
+  function animationLoop(){
+    const now = Date.now();
+    if (now - lastUpdateTime > 50) {
+      updateClouds(now);
+      render();
+      lastUpdateTime = now;
+    }
+    requestAnimationFrame(animationLoop);
+  }
+
+  window.addEventListener('resize', render);
+
+  // ---- live weather data ----
+  // mapWeatherToInputs() returns the same {key: {value: ...}} shape as
+  // `inputs` above; flatten it to the {key: value} shape updateWeatherData()
+  // expects, then feed it straight into the existing render pipeline.
+  // horizon is left alone — you said it stays at 0.5.
+  function applyWeatherData(weatherData){
+    const mapped = mapWeatherToInputs(weatherData);
+    const flat = {};
+    Object.keys(mapped).forEach(key => { flat[key] = mapped[key].value; });
+    updateWeatherData(flat);
+  }
+
+  window.addEventListener('weatherDataReady', (e) => applyWeatherData(e.detail));
+  window.addEventListener('weatherDataError', (e) => console.error('Weather fetch failed:', e.detail));
+  startWeatherPolling(); // fetches immediately, then refreshes every 10 minutes
+
+  render();
+  requestAnimationFrame(animationLoop);
+})();
+</script>
+</body>
+</html>

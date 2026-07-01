@@ -1,0 +1,9 @@
+<svg id="clouds" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="720" height="720" viewBox="0 0 720 720">
+  <g id="pclo1">
+    <g id="perc">
+      <g id="lil_rain_st" data-name="lil rain st">
+        <image x="256" y="450" width="182" height="128" xlink:href="data:img/png;base64,iVBORw0KGgoAAAANSUhEUgAAALYAAACACAYAAACm05O0AAADbElEQVR4nO3dW27aUBSGURtlbplPHjqIPGQ+GZ2roIIs48vBQM7x37WkSGlzKQpftraNof0wDB2/5+Pz+/JvjX/w/ejPP+93X3/e3SsPOB32lmcZR27SPIGwGzWa7Owg7Pb0//sP4BmEXcfaumEVeQJh17E1lcX9IGETSdj1rE3t88ccQO4n7HqsGy8k7DaJ/kHCbtc5buvIPsKup/h8tbjvJ+x6rBsvJOx6Sia2+HcSdj0l0fbi3kfYbRP1TsImkrDrWdqxXd33BMJuz3T9EPoOwq7H/vxCwq6nZBI7K7KTsH/ZjifpWkV2eDvcLc4yN5GF/AQmdn396K2zejyHid2W2WntNUbu5wVzKim5Yk/Q+wm7sqXARf0YYRPJwSORhE0kYRNJ2EQSNpGETSRhE0nYRBI2kYRNJGETSdhEEjaRhE0kYRNJ2EQSNpGETSRhE0nYRBI2kYRNJGETSdhEEjaRhE0kYRNJ2EQSNpGETSRhE0nYRBI2kYRNJGETSdhEEjaRhE0kYRNJ2EQSNpGETSRhE0nYRBI2kYRNJGETSdhEEjaRhE0kYRNJ2EQSNpGETSRhE0nYRBI2kYRNJGETSdhEEjaRhE0kYRPpzd1Kyz4+v2dv3def99VbfRP23Dfa+ibw2346XetybRUZ/r1BFUvTusTbxhf37lIaMR6ym12OJ/Z4QpvUHNrcKiJqWrLY49q2MQ67n7zfi5wGzHW42eXSwaMDR1oy3anv2rHnOHiktrkBe/27pXXEI4+0btdKPD0rAq3Z1aWJTeuW1uHVdWTprAgcweI0t4rQurUuF4exVYTWrW0Si+vIafoJkOAS9txvhZ2bVqw9QDM7lLcuW4XWFJ3XdlaEI7k0Or2u6Wy8Z2+dFTG1acHaRVCz1zU5K8LRFA3bpbMicyMfahju6fCyjpw2VpChe/C5Z/CgfhT30gC+cSr9bRA3lc1N7umufbV2HhtaMA56a7++bhglB4+DlYTKSvfs6+d4SJ0mTYZo6UZx7dgqQut2P4Om9Im7pjo13Nvd+fNLdmzntDmc0oNHqKXkNW5uhu7WeWxTmtpKVuWbsyZbB4/Dxsfh1frC/satDtPLVlcvC4RKtgbs9IkH/dyOPY5b1FSx8KLuWyvJtdm7Llv1PxtQydaQvd2xf2IVLAdR9tzcruv+AohLncHPOQMzAAAAAElFTkSuQmCC"/>
+      </g>
+    </g>
+  </g>
+</svg>
