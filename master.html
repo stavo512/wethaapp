@@ -491,37 +491,37 @@
   <div class="stats-box anchor-top" id="statsBox">
 
     <!-- THERMOMETER + TEMPERATURE -->
-    <div class="stat-icon" style="left:145px; top:96px; width:43px; height:135px;">
+    <div class="stat-icon" style="left:145px; top:56px; width:43px; height:135px;">
       <img src="assets/icon temp.svg" alt="temperature">
     </div>
-    <div class="stat rd-row baseline" style="left:192px; top:100px;">
+    <div class="stat rd-row baseline" style="left:192px; top:60px;">
       <span class="stat-num" id="tempVal"></span>
     </div>
 
     <!-- WIND -->
-    <div class="stat-icon" style="left:231px; top:317px; width:105px; height:77px;">
+    <div class="stat-icon" style="left:231px; top:277px; width:105px; height:77px;">
       <img src="assets/icon wind.svg" alt="wind">
     </div>
-    <div class="stat rd-row" style="left:146px; top:340px; align-items:flex-end;">
+    <div class="stat rd-row" style="left:146px; top:300px; align-items:flex-end;">
       <span class="stat-num" id="windVal"></span>
       <span class="rd-unit-stack gap-sm" style="height:32px; position:relative; top:-6px; left:2px;"><span>km</span><span>h</span></span>
     </div>
 
     <!-- RAINDROP -->
-    <div class="stat-icon" style="left:532px; top:205px; width:44px; height:130px;">
+    <div class="stat-icon" style="left:532px; top:185px; width:44px; height:130px;">
       <img src="assets/icon rain.svg" alt="rain">
     </div>
-    <div class="stat rd-row baseline" style="left:502px; top:338px;">
+    <div class="stat rd-row baseline" style="left:502px; top:298px;">
       <span class="stat-num" id="rainVal"></span>
       <span class="unit-mm gap-sm">mm</span>
     </div>
 
     <!-- HUMIDITY -->
-    <div class="stat rd-row baseline" style="left:711px; top:309px;">
+    <div class="stat rd-row baseline" style="left:711px; top:289px;">
       <span class="stat-num" id="humidityVal"></span>
       <span class="stat-num gap-sm">%</span>
     </div>
-    <div class="stat-icon" style="left:709px; top:358px; width:89px; height:116px;">
+    <div class="stat-icon" style="left:709px; top:338px; width:89px; height:116px;">
       <img src="assets/icon humid.svg" alt="humidity">
     </div>
 
@@ -730,7 +730,7 @@
   function render() {
     const W = picker.clientWidth;
     const H = picker.clientHeight;
-    const anchorY = H / 2;
+    const anchorY = H / 2 - 80;
     const dotCenterX = W * (0.5 - GROUP_SHIFT_FRACTION) - 1.5 * TRIANGLE_LEN + 2 * TRIANGLE_LEN + 0.75 * TRIANGLE_LEN + 1 * TRIANGLE_LEN;
 
     let nearestIndex = 0;
